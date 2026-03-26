@@ -27,16 +27,11 @@ Helm chart for [GROWI](https://growi.org) v7.x — Team Knowledge Base (Wiki).
 
 ## Installation
 
-### 1. Dependency update
-
 ```bash
-helm dependency update .
-```
+helm repo add 4nm1tsu https://4nm1tsu.github.io/growi-helm-chart/
+helm repo update
 
-### 2. Install
-
-```bash
-helm install my-growi . \
+helm install my-growi 4nm1tsu/growi \
   --namespace growi --create-namespace \
   --set growi.passwordSeed=$(openssl rand -hex 32) \
   --set growi.secretToken=$(openssl rand -hex 32) \
@@ -47,15 +42,7 @@ helm install my-growi . \
 > ⚠️ **`growi.passwordSeed` must never be changed after installation.**
 > It is used to hash all user passwords in MongoDB. Changing it invalidates all existing passwords.
 
-### 3. First run
-
 On first access you will be redirected to `/installer` to complete the initial setup.
-
-### 4. Run tests
-
-```bash
-helm test my-growi -n growi
-```
 
 ---
 
@@ -64,7 +51,7 @@ helm test my-growi -n growi
 Always check the [GROWI Upgrade Guide](https://docs.growi.org/en/admin-guide/) before upgrading.
 
 ```bash
-helm upgrade my-growi . \
+helm upgrade my-growi 4nm1tsu/growi \
   --namespace growi \
   --values my-values.yaml \
   --set growi.passwordSeed="<your-seed>" \
@@ -101,107 +88,6 @@ ingress:
     - hosts:
         - growi.example.com
       secretName: letsencrypt-cert-growi
-```
-
-### NFS Static Provisioning
-
-Create directories on your NFS server first:
-
-```bash
-sudo mkdir -p /k8s/growi/{data,bulk-export,mongodb,elasticsearch}
-sudo chmod 777 /k8s/growi/{data,bulk-export,mongodb,elasticsearch}
-```
-
-Apply PersistentVolumes (adjust NFS server IP and release name):
-
-```yaml
-# pv-growi-data
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-growi-data
-spec:
-  storageClassName: growi-data
-  capacity:
-    storage: 10Gi
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  nfs:
-    server: 192.168.1.x
-    path: /k8s/growi/data
----
-# pv-growi-bulk-export
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-growi-bulk-export
-spec:
-  storageClassName: growi-bulk-export
-  capacity:
-    storage: 2Gi
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  nfs:
-    server: 192.168.1.x
-    path: /k8s/growi/bulk-export
----
-# MongoDB PVC name = "<release-name>-mongodb"
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-growi-mongodb
-spec:
-  storageClassName: growi-mongodb
-  capacity:
-    storage: 8Gi
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  claimRef:
-    namespace: growi
-    name: my-growi-mongodb        # ← <release-name>-mongodb
-  nfs:
-    server: 192.168.1.x
-    path: /k8s/growi/mongodb
----
-# ES PVC name = "es-data-<release-name>-elasticsearch-0"
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-growi-elasticsearch
-spec:
-  storageClassName: growi-elasticsearch
-  capacity:
-    storage: 10Gi
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  claimRef:
-    namespace: growi
-    name: es-data-my-growi-elasticsearch-0   # ← es-data-<release-name>-elasticsearch-0
-  nfs:
-    server: 192.168.1.x
-    path: /k8s/growi/elasticsearch
-```
-
-Then set storageClass in values:
-
-```yaml
-persistence:
-  data:
-    storageClass: "growi-data"
-  bulkExport:
-    storageClass: "growi-bulk-export"
-
-mongodb:
-  persistence:
-    storageClass: "growi-mongodb"
-
-elasticsearch:
-  persistence:
-    storageClass: "growi-elasticsearch"
 ```
 
 ### External MongoDB
@@ -339,7 +225,6 @@ Elasticsearch requires `vm.max_map_count=262144`. A privileged initContainer set
 If your cluster policy prohibits privileged containers, configure nodes manually and disable the initContainer:
 
 ```bash
-# On each node
 sudo sysctl -w vm.max_map_count=262144
 echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
 ```
