@@ -1,0 +1,36 @@
+apiVersion: v2
+name: growi
+description: >
+  GROWI - Team Knowledge Base (Wiki) powered by Markdown.
+  Includes MongoDB, Elasticsearch (with kuromoji/ICU plugins), and PDF Converter.
+type: application
+version: 1.0.0
+appVersion: "7.4.0"
+keywords:
+  - growi
+  - wiki
+  - knowledge-base
+  - markdown
+  - collaboration
+home: https://growi.org
+sources:
+  - https://github.com/growilabs/growi
+  - https://github.com/growilabs/growi-docker-compose
+icon: https://avatars.githubusercontent.com/u/93908710?s=200&v=4
+maintainers:
+  - name: community
+annotations:
+  artifacthub.io/license: MIT
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial release supporting GROWI v7.x
+    - kind: added
+      description: Elasticsearch 9.x with kuromoji/ICU plugins via initContainer
+    - kind: added
+      description: PDF Converter with /dev/shm tmpfs support
+dependencies:
+  - name: mongodb
+    version: "~18"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    condition: mongodb.enabled

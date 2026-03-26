@@ -1,0 +1,60 @@
+GROWI {{ .Chart.AppVersion }} has been deployed!
+
+=====================================================================
+  RELEASE: {{ .Release.Name }}
+  NAMESPACE: {{ .Release.Namespace }}
+=====================================================================
+
+━━━ Access ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{{- if .Values.ingress.enabled }}
+  GROWI is exposed via Ingress:
+  {{- range .Values.ingress.hosts }}
+  🌐  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+  {{- end }}
+
+{{- else if eq .Values.service.type "LoadBalancer" }}
+  Waiting for LoadBalancer IP...
+  Run: kubectl get svc {{ include "growi.fullname" . }} -n {{ .Release.Namespace }}
+
+{{- else }}
+  Port-forward to access GROWI locally:
+
+  kubectl port-forward svc/{{ include "growi.fullname" . }} 3000:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+
+  Then open: http://localhost:3000
+
+{{- end }}
+
+━━━ Components ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅ GROWI App        growilabs/growi:{{ .Values.image.tag }}
+  {{- if .Values.mongodb.enabled }}
+  ✅ MongoDB          (bitnami subchart)
+  {{- else }}
+  ⚙️  MongoDB          External
+  {{- end }}
+  {{- if .Values.elasticsearch.enabled }}
+  ✅ Elasticsearch    {{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}
+  {{- else }}
+  ⚙️  Elasticsearch    External (or disabled)
+  {{- end }}
+  {{- if .Values.pdfConverter.enabled }}
+  ✅ PDF Converter    growilabs/pdf-converter:{{ .Values.pdfConverter.image.tag }}
+  {{- end }}
+
+━━━ First Run ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  On first access you will be redirected to /installer to
+  complete the initial setup.
+
+━━━ Elasticsearch Re-index ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  After upgrading, rebuild the search index:
+  Admin → Full-text Search Management → Normalize Indices
+
+━━━ Run Tests ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+=====================================================================

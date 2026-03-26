@@ -1,0 +1,141 @@
+{{- if .Values.elasticsearch.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "growi.elasticsearch.fullname" . }}
+  labels:
+    {{- include "growi.elasticsearch.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "growi.elasticsearch.fullname" . }}-headless
+  replicas: {{ .Values.elasticsearch.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "growi.elasticsearch.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.elasticsearch.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "growi.elasticsearch.labels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- if .Values.elasticsearch.sysctlInitContainer.enabled }}
+        - name: sysctl
+          image: busybox
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+        {{- end }}
+        # kuromoji / ICU Analysis プラグインをインストール (GROWI全文検索に必須)
+        - name: install-plugins
+          image: "{{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}"
+          imagePullPolicy: {{ .Values.elasticsearch.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              if ! /usr/share/elasticsearch/bin/elasticsearch-plugin list | grep -q analysis-kuromoji; then
+                echo "Installing analysis-kuromoji..."
+                /usr/share/elasticsearch/bin/elasticsearch-plugin install --batch analysis-kuromoji
+              else
+                echo "analysis-kuromoji already installed"
+              fi
+              if ! /usr/share/elasticsearch/bin/elasticsearch-plugin list | grep -q analysis-icu; then
+                echo "Installing analysis-icu..."
+                /usr/share/elasticsearch/bin/elasticsearch-plugin install --batch analysis-icu
+              else
+                echo "analysis-icu already installed"
+              fi
+          volumeMounts:
+            - name: es-plugins
+              mountPath: /usr/share/elasticsearch/plugins
+          securityContext:
+            runAsUser: 1000
+      containers:
+        - name: elasticsearch
+          image: "{{ .Values.elasticsearch.image.repository }}:{{ .Values.elasticsearch.image.tag }}"
+          imagePullPolicy: {{ .Values.elasticsearch.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 9200
+              protocol: TCP
+            - name: transport
+              containerPort: 9300
+              protocol: TCP
+          env:
+            - name: ES_JAVA_OPTS
+              value: {{ .Values.elasticsearch.javaOpts | quote }}
+            - name: LOG4J_FORMAT_MSG_NO_LOOKUPS
+              value: "true"
+            - name: discovery.type
+              value: single-node
+            - name: bootstrap.memory_lock
+              value: "true"
+            - name: xpack.security.enabled
+              value: "false"
+          securityContext:
+            capabilities:
+              add:
+                - IPC_LOCK
+          volumeMounts:
+            {{- if .Values.elasticsearch.persistence.enabled }}
+            - name: es-data
+              mountPath: /usr/share/elasticsearch/data
+            {{- end }}
+            - name: es-plugins
+              mountPath: /usr/share/elasticsearch/plugins
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health?wait_for_status=yellow&timeout=5s
+              port: 9200
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.elasticsearch.resources | nindent 12 }}
+      volumes:
+        - name: es-plugins
+          emptyDir: {}
+      {{- with .Values.elasticsearch.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.elasticsearch.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.elasticsearch.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.elasticsearch.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: es-data
+        {{- with .Values.elasticsearch.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          - {{ .Values.elasticsearch.persistence.accessMode }}
+        resources:
+          requests:
+            storage: {{ .Values.elasticsearch.persistence.size }}
+        {{- if .Values.elasticsearch.persistence.storageClass }}
+        storageClassName: {{ .Values.elasticsearch.persistence.storageClass }}
+        {{- end }}
+  {{- end }}
+{{- end }}

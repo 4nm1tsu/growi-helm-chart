@@ -1,0 +1,293 @@
+# ============================================================
+# GROWI v7 Helm Chart - values.yaml
+# ============================================================
+
+# ------------------------------
+# GROWI App
+# ------------------------------
+replicaCount: 1
+
+image:
+  repository: growilabs/growi
+  # Use a specific patch version in production, e.g. "7.4.0"
+  tag: "7"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext: {}
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: growi.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: growi-tls
+  #   hosts:
+  #     - growi.example.com
+
+resources: {}
+  # requests:
+  #   cpu: 200m
+  #   memory: 512Mi
+  # limits:
+  #   cpu: 1000m
+  #   memory: 1Gi
+
+livenessProbe:
+  httpGet:
+    path: /_api/v3/healthcheck
+    port: 3000
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 5
+
+readinessProbe:
+  httpGet:
+    path: /_api/v3/healthcheck
+    port: 3000
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+updateStrategy:
+  type: RollingUpdate
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# ------------------------------
+# GROWI Application Configuration
+# ------------------------------
+growi:
+  # MongoDB connection URI.
+  # Leave empty to auto-generate when mongodb.enabled=true.
+  mongoUri: ""
+
+  # Elasticsearch connection URI.
+  # Leave empty to auto-generate when elasticsearch.enabled=true.
+  elasticsearchUri: ""
+
+  # Password hash seed. REQUIRED - must be set at install time.
+  # Generate with: openssl rand -hex 32
+  # WARNING: Changing this after install will invalidate all passwords.
+  passwordSeed: ""
+
+  # Secret key for signed cookies. REQUIRED - must be set at install time.
+  # Generate with: openssl rand -hex 32
+  secretToken: ""
+
+  # Site URL (required when behind a reverse proxy / Ingress)
+  # e.g. https://growi.example.com
+  siteUrl: ""
+
+  # Trust proxy headers (set true when behind nginx ingress)
+  trustProxy: false
+
+  # Session cookie name
+  sessionName: ""
+
+  # File upload storage backend.
+  # Options: aws | gcs | azure | mongodb | local
+  fileUpload: "local"
+
+  # Max file upload size in bytes (default: unlimited)
+  maxFileSize: ""
+
+  # Force wiki mode: "" | public | private
+  forceWikiMode: ""
+
+  # Enable MathJax rendering
+  mathjax: false
+
+  # PlantUML server URI
+  plantumlUri: ""
+
+  # HackMD / CodiMD integration URI
+  hackmdUri: ""
+
+  # Publish OpenAPI docs at /api-docs
+  publishOpenApi: false
+
+  # Disable OpenTelemetry
+  openTelemetryEnabled: false
+
+  # Additional environment variables
+  # extraEnv:
+  #   - name: FORMAT_NODE_LOG
+  #     value: "false"
+  extraEnv: []
+
+  # Reference environment variables from existing Secrets
+  # extraEnvFrom:
+  #   - secretRef:
+  #       name: my-growi-secret
+  extraEnvFrom: []
+
+# ------------------------------
+# Persistent Storage
+# ------------------------------
+persistence:
+  # GROWI data directory (/data)
+  data:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    annotations: {}
+    existingClaim: ""
+
+  # Temporary directory for bulk PDF export
+  bulkExport:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 2Gi
+    annotations: {}
+    existingClaim: ""
+
+# ------------------------------
+# MongoDB (bitnami subchart)
+# ref: https://artifacthub.io/packages/helm/bitnami/mongodb
+# Note: Do not override image.tag - use bitnami chart defaults
+# ------------------------------
+mongodb:
+  enabled: true
+  auth:
+    enabled: false
+  architecture: standalone
+  persistence:
+    enabled: true
+    size: 8Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# External MongoDB (used when mongodb.enabled=false)
+# externalMongodb:
+#   uri: "mongodb://user:pass@my-mongo-host:27017/growi"
+
+# ------------------------------
+# Elasticsearch
+# Official image + kuromoji/ICU plugins installed via initContainer
+# ref: https://www.elastic.co/guide/en/elasticsearch/reference/current
+# ------------------------------
+elasticsearch:
+  enabled: true
+
+  image:
+    repository: docker.elastic.co/elasticsearch/elasticsearch
+    # ES 9.x is recommended for GROWI v7
+    tag: "9.0.1"
+    pullPolicy: IfNotPresent
+
+  # ES_JAVA_OPTS heap size
+  javaOpts: "-Xms256m -Xmx256m"
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 9200
+
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    annotations: {}
+    existingClaim: ""
+
+  # Run privileged initContainer to set vm.max_map_count=262144
+  # Required by Elasticsearch. Set false if already configured on nodes.
+  sysctlInitContainer:
+    enabled: true
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# External Elasticsearch (used when elasticsearch.enabled=false)
+# externalElasticsearch:
+#   uri: "http://my-es-host:9200/growi"
+
+# ------------------------------
+# PDF Converter
+# Used for bulk page export to PDF
+# ------------------------------
+pdfConverter:
+  enabled: true
+
+  image:
+    repository: growilabs/pdf-converter
+    tag: "1"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3010
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ------------------------------
+# HPA
+# ------------------------------
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+# ------------------------------
+# PodDisruptionBudget
+# ------------------------------
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

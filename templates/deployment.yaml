@@ -1,0 +1,174 @@
+{{- include "growi.validateValues" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "growi.fullname" . }}
+  labels:
+    {{- include "growi.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "growi.selectorLabels" . | nindent 6 }}
+  strategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "growi.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "growi.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: growi
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            # ---- Required ----
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "growi.fullname" . }}
+                  key: MONGO_URI
+            - name: PASSWORD_SEED
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "growi.fullname" . }}
+                  key: PASSWORD_SEED
+            - name: SECRET_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "growi.fullname" . }}
+                  key: SECRET_TOKEN
+
+            # ---- Elasticsearch ----
+            {{- $esUri := include "growi.elasticsearchUri" . }}
+            {{- if $esUri }}
+            - name: ELASTICSEARCH_URI
+              value: {{ $esUri | quote }}
+            {{- end }}
+
+            # ---- PDF Converter ----
+            {{- if .Values.pdfConverter.enabled }}
+            - name: BULK_EXPORT_PDF_CONVERTER_URI
+              value: {{ include "growi.pdfConverterUri" . | quote }}
+            {{- end }}
+
+            # ---- Site URL & Proxy ----
+            {{- if .Values.growi.siteUrl }}
+            - name: APP_SITE_URL
+              value: {{ .Values.growi.siteUrl | quote }}
+            {{- end }}
+            {{- if .Values.growi.trustProxy }}
+            - name: TRUST_PROXY_BOOL
+              value: "true"
+            {{- end }}
+
+            # ---- Optional settings ----
+            {{- if .Values.growi.sessionName }}
+            - name: SESSION_NAME
+              value: {{ .Values.growi.sessionName | quote }}
+            {{- end }}
+            {{- if .Values.growi.fileUpload }}
+            - name: FILE_UPLOAD
+              value: {{ .Values.growi.fileUpload | quote }}
+            {{- end }}
+            {{- if .Values.growi.maxFileSize }}
+            - name: MAX_FILE_SIZE
+              value: {{ .Values.growi.maxFileSize | quote }}
+            {{- end }}
+            {{- if .Values.growi.forceWikiMode }}
+            - name: FORCE_WIKI_MODE
+              value: {{ .Values.growi.forceWikiMode | quote }}
+            {{- end }}
+            {{- if .Values.growi.mathjax }}
+            - name: MATHJAX
+              value: "1"
+            {{- end }}
+            {{- if .Values.growi.plantumlUri }}
+            - name: PLANTUML_URI
+              value: {{ .Values.growi.plantumlUri | quote }}
+            {{- end }}
+            {{- if .Values.growi.hackmdUri }}
+            - name: HACKMD_URI
+              value: {{ .Values.growi.hackmdUri | quote }}
+            {{- end }}
+            {{- if .Values.growi.publishOpenApi }}
+            - name: PUBLISH_OPEN_API
+              value: "true"
+            {{- end }}
+            - name: OPENTELEMETRY_ENABLED
+              value: {{ .Values.growi.openTelemetryEnabled | quote }}
+
+            # ---- Extra env vars ----
+            {{- with .Values.growi.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          {{- with .Values.growi.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          volumeMounts:
+            {{- if .Values.persistence.data.enabled }}
+            - name: growi-data
+              mountPath: /data
+            {{- end }}
+            {{- if .Values.persistence.bulkExport.enabled }}
+            - name: bulk-export-tmp
+              mountPath: /tmp/page-bulk-export
+            {{- end }}
+
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+      volumes:
+        {{- if .Values.persistence.data.enabled }}
+        - name: growi-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.data.existingClaim | default (printf "%s-data" (include "growi.fullname" .)) }}
+        {{- end }}
+        {{- if .Values.persistence.bulkExport.enabled }}
+        - name: bulk-export-tmp
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.bulkExport.existingClaim | default (printf "%s-bulk-export" (include "growi.fullname" .)) }}
+        {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

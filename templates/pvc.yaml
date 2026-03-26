@@ -1,0 +1,43 @@
+{{- if and .Values.persistence.data.enabled (not .Values.persistence.data.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "growi.fullname" . }}-data
+  labels:
+    {{- include "growi.labels" . | nindent 4 }}
+  {{- with .Values.persistence.data.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.data.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.data.size }}
+  {{- if .Values.persistence.data.storageClass }}
+  storageClassName: {{ .Values.persistence.data.storageClass }}
+  {{- end }}
+{{- end }}
+---
+{{- if and .Values.persistence.bulkExport.enabled (not .Values.persistence.bulkExport.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "growi.fullname" . }}-bulk-export
+  labels:
+    {{- include "growi.labels" . | nindent 4 }}
+  {{- with .Values.persistence.bulkExport.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.bulkExport.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.bulkExport.size }}
+  {{- if .Values.persistence.bulkExport.storageClass }}
+  storageClassName: {{ .Values.persistence.bulkExport.storageClass }}
+  {{- end }}
+{{- end }}

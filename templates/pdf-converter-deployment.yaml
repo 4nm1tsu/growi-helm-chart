@@ -1,0 +1,79 @@
+{{- if .Values.pdfConverter.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "growi.pdfConverter.fullname" . }}
+  labels:
+    {{- include "growi.pdfConverter.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "growi.pdfConverter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.pdfConverter.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "growi.pdfConverter.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: pdf-converter
+          image: "{{ .Values.pdfConverter.image.repository }}:{{ .Values.pdfConverter.image.tag }}"
+          imagePullPolicy: {{ .Values.pdfConverter.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3010
+              protocol: TCP
+          volumeMounts:
+            {{- if .Values.persistence.bulkExport.enabled }}
+            - name: bulk-export-tmp
+              mountPath: /tmp/page-bulk-export
+            {{- end }}
+            # Chromium(puppeteer)の共有メモリ不足対策
+            - name: dshm
+              mountPath: /dev/shm
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3010
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3010
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.pdfConverter.resources | nindent 12 }}
+      volumes:
+        {{- if .Values.persistence.bulkExport.enabled }}
+        - name: bulk-export-tmp
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.bulkExport.existingClaim | default (printf "%s-bulk-export" (include "growi.fullname" .)) }}
+        {{- end }}
+        # /dev/shm を tmpfs で拡張 (Chromium に必要)
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+      {{- with .Values.pdfConverter.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.pdfConverter.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.pdfConverter.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

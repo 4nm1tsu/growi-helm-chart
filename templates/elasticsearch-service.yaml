@@ -1,0 +1,38 @@
+{{- if .Values.elasticsearch.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "growi.elasticsearch.fullname" . }}
+  labels:
+    {{- include "growi.elasticsearch.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.elasticsearch.service.type }}
+  ports:
+    - port: {{ .Values.elasticsearch.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 9300
+      targetPort: transport
+      protocol: TCP
+      name: transport
+  selector:
+    {{- include "growi.elasticsearch.selectorLabels" . | nindent 4 }}
+---
+# Headless service for StatefulSet DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "growi.elasticsearch.fullname" . }}-headless
+  labels:
+    {{- include "growi.elasticsearch.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    - port: 9200
+      name: http
+    - port: 9300
+      name: transport
+  selector:
+    {{- include "growi.elasticsearch.selectorLabels" . | nindent 4 }}
+{{- end }}
