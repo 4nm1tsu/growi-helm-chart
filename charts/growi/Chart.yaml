@@ -4,7 +4,7 @@ description: >
   GROWI - Team Knowledge Base (Wiki) powered by Markdown.
   Includes MongoDB, Elasticsearch (with kuromoji/ICU plugins), and PDF Converter.
 type: application
-version: 1.0.0
+version: 1.0.1
 appVersion: "7.4.0"
 keywords:
   - growi
@@ -23,12 +23,8 @@ annotations:
   artifacthub.io/license: MIT
   artifacthub.io/prerelease: "false"
   artifacthub.io/changes: |
-    - kind: added
-      description: Initial release supporting GROWI v7.x
-    - kind: added
-      description: Elasticsearch 9.x with kuromoji/ICU plugins via initContainer
-    - kind: added
-      description: PDF Converter with /dev/shm tmpfs support
+    - kind: changed
+      description: Update README
 dependencies:
   - name: mongodb
     version: "~18"

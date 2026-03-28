@@ -132,32 +132,6 @@ growi:
       value: ap-northeast-1
 ```
 
-### Authentik OIDC
-
-OIDC is configured via the GROWI Admin UI after deployment (`/admin/security`).
-
-In Authentik, create an OAuth2/OpenID Connect provider with:
-
-| Field | Value |
-|---|---|
-| Redirect URI | `https://growi.example.com/passport/oidc/callback` |
-
-Then in GROWI Admin → Security Settings → OIDC tab:
-
-| Field | Value |
-|---|---|
-| Issuer | `https://authentik.example.com/application/o/<slug>/` |
-| Authorization Endpoint | `https://authentik.example.com/application/o/authorize/` |
-| Token Endpoint | `https://authentik.example.com/application/o/token/` |
-| User Info Endpoint | `https://authentik.example.com/application/o/userinfo/` |
-| JWKS URL | `https://authentik.example.com/application/o/<slug>/jwks/` |
-| Identifier | `sub` |
-| username | `preferred_username` |
-| name | `preferred_username` |
-| email | `email` |
-
----
-
 ## Parameters
 
 ### GROWI App
